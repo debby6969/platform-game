@@ -39,41 +39,70 @@
     const WIDTH = 1000;
     const HEIGHT = 600;
 
-    // Platform
-    const PLATFORM_W = 500;
-    const PLATFORM_H = 10;
-    const PLATFORM_X = (WIDTH - PLATFORM_W) / 2;
-    const PLATFORM_Y = 300;
+    // Platforms
+    const platforms = [
+        {
+            x: 250,
+            y: 300,
+            width: 500,
+            height: 10
+        },
+        {
+            x: 400,
+            y: 190,
+            width: 200,
+            height: 10
+        }
+    ];
 
     // Player
     const PLAYER_W = 20;
     const PLAYER_H = 40;
     const SPEED = 250;
 
-    let playerX = PLATFORM_X + (PLATFORM_W - PLAYER_W) / 2;
-    const playerY = PLATFORM_Y - PLAYER_H;
+    let playerX = WIDTH / 2 - PLAYER_W / 2;
+    let playerY = platforms[0].y - PLAYER_H;
+
+    // Physics
+    const GRAVITY = 1200;
+    const JUMP_FORCE = -550;
+
+    let velocityY = 0;
+    let onGround = true;
 
     // Keyboard input
     const keys = new Set();
 
-    canvas.addEventListener("keydown", (e) => {
+    window.addEventListener("keydown", (e) => {
         const key = e.key.toLowerCase();
 
-        if (["a", "d", "arrowleft", "arrowright"].includes(key)) {
+        if (["a", "d", "arrowleft", "arrowright", " "].includes(key)) {
             e.preventDefault();
-            keys.add(key);
         }
+
+        keys.add(key);
     });
 
-    canvas.addEventListener("keyup", (e) => {
+    window.addEventListener("keyup", (e) => {
         keys.delete(e.key.toLowerCase());
     });
 
-    // Prevent stuck keys when browser loses focus
-    window.addEventListener("blur", () => keys.clear());
+    window.addEventListener("blur", () => {
+        keys.clear();
+    });
+
+    // Jump function
+    function jump() {
+        if (onGround) {
+            velocityY = JUMP_FORCE;
+            onGround = false;
+        }
+    }
 
     // Update game logic
     function update(dt) {
+
+        // Horizontal movement
         let dx = 0;
 
         if (keys.has("a") || keys.has("arrowleft")) {
@@ -84,21 +113,83 @@
             dx += SPEED * dt;
         }
 
-        // Move player without boundaries
         playerX += dx;
+
+        // Reset player if completely off screen
+        if (playerX + PLAYER_W < 0 || playerX > WIDTH) {
+            playerX = WIDTH / 2 - PLAYER_W / 2;
+            playerY = platforms[0].y - PLAYER_H;
+            velocityY = 0;
+            onGround = true;
+        }
+
+        // Jump
+        if (keys.has(" ")) {
+            jump();
+        }
+
+        // Store previous vertical position
+        const previousY = playerY;
+
+        // Apply gravity
+        velocityY += GRAVITY * dt;
+        playerY += velocityY * dt;
+
+        // Platform collision detection
+        onGround = false;
+
+        if (velocityY >= 0) {
+            for (const platform of platforms) {
+
+                const previousBottom = previousY + PLAYER_H;
+                const currentBottom = playerY + PLAYER_H;
+
+                const overlapsPlatform =
+                    playerX + PLAYER_W > platform.x &&
+                    playerX < platform.x + platform.width;
+
+                const crossedPlatform =
+                    previousBottom <= platform.y &&
+                    currentBottom >= platform.y;
+
+                if (overlapsPlatform && crossedPlatform) {
+                    playerY = platform.y - PLAYER_H;
+                    velocityY = 0;
+                    onGround = true;
+                    break;
+                }
+            }
+        }
+
+        // Fall below screen: reset player
+        if (playerY > HEIGHT) {
+            playerX = WIDTH / 2 - PLAYER_W / 2;
+            playerY = platforms[0].y - PLAYER_H;
+            velocityY = 0;
+            onGround = true;
+        }
     }
 
     // Draw everything
     function draw() {
+
         // Background
         ctx.fillStyle = "#151F4D";
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-        // Platform
+        // Draw platforms
         ctx.fillStyle = "#a6adc8";
-        ctx.fillRect(PLATFORM_X, PLATFORM_Y, PLATFORM_W, PLATFORM_H);
 
-        // Player
+        for (const platform of platforms) {
+            ctx.fillRect(
+                platform.x,
+                platform.y,
+                platform.width,
+                platform.height
+            );
+        }
+
+        // Draw player
         ctx.fillStyle = "#f38ba8";
         ctx.fillRect(playerX, playerY, PLAYER_W, PLAYER_H);
     }
@@ -107,6 +198,7 @@
     let lastTime = 0;
 
     function gameLoop(timestamp) {
+
         if (lastTime === 0) {
             lastTime = timestamp;
         }
@@ -123,7 +215,6 @@
     // Start game
     requestAnimationFrame(gameLoop);
 
-    // Give canvas keyboard focus
     canvas.focus();
 
 </script>
