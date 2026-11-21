@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Platform Climber</title>
+    <title>Ascend - Platform Climber</title>
 
     <style>
         * {
@@ -19,19 +19,212 @@
             align-items: center;
             min-height: 100vh;
             font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        .game-wrapper {
+            position: relative;
+            width: min(1000px, 95vw);
         }
 
         canvas {
+            display: block;
+            width: 100%;
+            height: auto;
             border: 2px solid #a6adc8;
-            max-width: 95vw;
-            max-height: 90vh;
+        }
+
+        .screen {
+            position: absolute;
+            inset: 2px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 18, 50, 0.88);
+            padding: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .panel {
+            width: min(440px, 100%);
+            max-height: 95%;
+            overflow-y: auto;
+            background: #202d60;
+            border: 2px solid #a6adc8;
+            border-radius: 14px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+        }
+
+        h1 {
+            font-size: 42px;
+            margin: 0 0 10px;
+            color: #f4f6ff;
+            letter-spacing: 3px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        p {
+            color: #c5cce8;
+            line-height: 1.5;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin-top: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #a6adc8;
+            color: #151F4D;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #dce2f5;
+            transform: scale(1.02);
+        }
+
+        button.secondary {
+            background: #475789;
+            color: white;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px;
+            margin-top: 12px;
+            border: 2px solid #a6adc8;
+            border-radius: 7px;
+            background: #151F4D;
+            color: white;
+            font-size: 16px;
+        }
+
+        .leaderboard {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .leaderboard th,
+        .leaderboard td {
+            padding: 11px 6px;
+            border-bottom: 1px solid #475789;
+        }
+
+        .leaderboard th {
+            color: #a6adc8;
+            font-size: 13px;
+        }
+
+        .leaderboard td:last-child,
+        .leaderboard th:last-child {
+            text-align: right;
+        }
+
+        .empty {
+            margin: 25px 0;
+            color: #a6adc8;
+        }
+
+        .time-result {
+            font-size: 38px;
+            font-weight: bold;
+            color: #c8f58b;
+            margin: 20px 0;
         }
     </style>
 </head>
 
 <body>
 
-<canvas id="game" width="1000" height="600"></canvas>
+<div class="game-wrapper">
+
+    <canvas id="game" width="1000" height="600"></canvas>
+
+    <!-- Main menu -->
+    <div class="screen" id="menuScreen">
+        <div class="panel">
+            <h1>ASCEND</h1>
+            <p>Climb 35 floors. Avoid the hazards. Reach the summit as fast as possible.</p>
+
+            <button id="startButton">START</button>
+            <button class="secondary" id="leaderboardButton">LEADERBOARD</button>
+
+            <p style="font-size: 13px;">
+                A / D or arrow keys to move<br>
+                Space, W or Up Arrow to jump
+            </p>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="screen hidden" id="leaderboardScreen">
+        <div class="panel">
+            <h2>LEADERBOARD</h2>
+            <p>Fastest completion times first.</p>
+
+            <table class="leaderboard">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody"></tbody>
+            </table>
+
+            <div id="emptyLeaderboard" class="empty hidden">
+                No completed runs yet. Be the first!
+            </div>
+
+            <button class="secondary" id="leaderboardBack">BACK</button>
+        </div>
+    </div>
+
+    <!-- Finish screen -->
+    <div class="screen hidden" id="finishScreen">
+        <div class="panel">
+            <h2>YOU REACHED THE SUMMIT!</h2>
+            <p>Your completion time:</p>
+
+            <div class="time-result" id="finalTime">00:00.000</div>
+
+            <p>Enter your name to save your score.</p>
+
+            <input
+                type="text"
+                id="playerName"
+                maxlength="18"
+                placeholder="Your name"
+                autocomplete="off"
+            >
+
+            <button id="saveScoreButton">SAVE SCORE</button>
+            <button class="secondary" id="finishLeaderboardButton">
+                LEADERBOARD
+            </button>
+            <button class="secondary" id="menuButton">
+                MAIN MENU
+            </button>
+        </div>
+    </div>
+
+</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -47,8 +240,10 @@ const SPEED = 250;
 const GRAVITY = 1300;
 const JUMP_FORCE = -560;
 
-const FLOOR_COUNT = 30;
+const FLOOR_COUNT = 35;
 const FLOOR_GAP = 85;
+
+const STORAGE_KEY = "ascendLeaderboard";
 
 let playerX;
 let playerY;
@@ -56,9 +251,21 @@ let velocityY = 0;
 let onGround = false;
 let cameraY = 0;
 
+let gameState = "menu";
+let startTime = 0;
+let elapsedTime = 0;
+let scoreSaved = false;
+
+let jumpRequested = false;
+
 const keys = new Set();
 const platforms = [];
 const hazards = [];
+
+// Screens
+const menuScreen = document.getElementById("menuScreen");
+const leaderboardScreen = document.getElementById("leaderboardScreen");
+const finishScreen = document.getElementById("finishScreen");
 
 // Platform layout
 function createPlatforms() {
@@ -73,6 +280,7 @@ function createPlatforms() {
     ];
 
     for (let i = 0; i < FLOOR_COUNT; i++) {
+
         const width = Math.max(130, 260 - i * 4.5);
         const centre = centres[i % centres.length];
 
@@ -86,13 +294,19 @@ function createPlatforms() {
 
         platforms.push(platform);
 
-        // Add hazards from floor 11 onwards
-        if (i >= 10) {
+        // Hazards start after floor 10.
+        // The final floor is kept safe.
+        if (i >= 10 && i < FLOOR_COUNT - 1) {
+
             const hazardWidth = 35;
             const hazardHeight = 22;
 
+            // Alternate the hazard side.
+            const hazardX = platform.x + (platform.width - hazardWidth) / 2;
+
+
             hazards.push({
-                x: centre - hazardWidth / 2,
+                x: hazardX,
                 y: platform.y - hazardHeight,
                 width: hazardWidth,
                 height: hazardHeight
@@ -113,6 +327,24 @@ function resetPlayer() {
     velocityY = 0;
     onGround = true;
     cameraY = 0;
+    jumpRequested = false;
+}
+
+// Start a new game
+function startGame() {
+    resetPlayer();
+
+    elapsedTime = 0;
+    startTime = performance.now();
+    scoreSaved = false;
+
+    keys.clear();
+
+    gameState = "playing";
+
+    menuScreen.classList.add("hidden");
+    leaderboardScreen.classList.add("hidden");
+    finishScreen.classList.add("hidden");
 }
 
 // Keyboard controls
@@ -123,14 +355,19 @@ window.addEventListener("keydown", (e) => {
         e.preventDefault();
     }
 
+    if (
+        [" ", "w", "arrowup"].includes(key) &&
+        !keys.has(key)
+    ) {
+        jumpRequested = true;
+    }
+
     keys.add(key);
 });
 
 window.addEventListener("keyup", (e) => {
     keys.delete(e.key.toLowerCase());
 });
-
-resetPlayer();
 
 // Colour interpolation
 function interpolateColour(start, end, amount) {
@@ -141,6 +378,7 @@ function interpolateColour(start, end, amount) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
+// Background becomes lighter as player climbs
 function getBackgroundColour(progress) {
     return interpolateColour(
         [21, 31, 77],
@@ -149,7 +387,14 @@ function getBackgroundColour(progress) {
     );
 }
 
+// Platform colours
 function getFloorColour(level) {
+
+    // Special final platform
+    if (level === FLOOR_COUNT - 1) {
+        return "#b8f542";
+    }
+
     return interpolateColour(
         [166, 173, 200],
         [245, 248, 255],
@@ -157,7 +402,7 @@ function getFloorColour(level) {
     );
 }
 
-// Collision detection between rectangles
+// Rectangle collision detection
 function rectanglesOverlap(a, b) {
     return (
         a.x < b.x + b.width &&
@@ -167,8 +412,141 @@ function rectanglesOverlap(a, b) {
     );
 }
 
+// Format time
+function formatTime(milliseconds) {
+    const minutes = Math.floor(milliseconds / 60000);
+    const seconds = Math.floor((milliseconds % 60000) / 1000);
+    const ms = Math.floor(milliseconds % 1000);
+
+    return (
+        String(minutes).padStart(2, "0") + ":" +
+        String(seconds).padStart(2, "0") + "." +
+        String(ms).padStart(3, "0")
+    );
+}
+
+// Finish game
+function finishGame() {
+    gameState = "finished";
+    scoreSaved = false;
+
+    document.getElementById("finalTime").textContent =
+        formatTime(elapsedTime);
+
+    document.getElementById("playerName").value = "";
+
+    keys.clear();
+    jumpRequested = false;
+
+    finishScreen.classList.remove("hidden");
+}
+
+// Leaderboard storage
+function getLeaderboard() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+        if (!Array.isArray(saved)) {
+            return [];
+        }
+
+        return saved.filter(entry =>
+            entry &&
+            typeof entry.name === "string" &&
+            Number.isFinite(entry.time) &&
+            entry.time >= 0
+        );
+    } catch (error) {
+        return [];
+    }
+}
+
+// Save score
+function saveScore() {
+    if (scoreSaved || gameState !== "finished") {
+        return;
+    }
+
+    const nameInput = document.getElementById("playerName");
+
+    const name = nameInput.value.trim().slice(0, 18);
+
+    if (!name) {
+        nameInput.focus();
+        nameInput.placeholder = "Please enter a name!";
+        return;
+    }
+
+    const leaderboard = getLeaderboard();
+
+    leaderboard.push({
+        name: name,
+        time: elapsedTime,
+        date: new Date().toISOString()
+    });
+
+    // Sort fastest times first
+    leaderboard.sort((a, b) => a.time - b.time);
+
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+    } catch (error) {
+        alert("Your browser could not save the leaderboard.");
+        return;
+    }
+
+    scoreSaved = true;
+
+    document.getElementById("saveScoreButton").textContent = "SCORE SAVED";
+    document.getElementById("saveScoreButton").disabled = true;
+}
+
+// Display leaderboard
+function showLeaderboard() {
+    const leaderboard = getLeaderboard();
+
+    leaderboard.sort((a, b) => a.time - b.time);
+
+    const body = document.getElementById("leaderboardBody");
+    const empty = document.getElementById("emptyLeaderboard");
+
+    body.innerHTML = "";
+
+    if (leaderboard.length === 0) {
+        empty.classList.remove("hidden");
+    } else {
+        empty.classList.add("hidden");
+
+        leaderboard.slice(0, 20).forEach((entry, index) => {
+            const row = document.createElement("tr");
+
+            const position = document.createElement("td");
+            position.textContent = index + 1;
+
+            const name = document.createElement("td");
+            name.textContent = entry.name;
+
+            const time = document.createElement("td");
+            time.textContent = formatTime(entry.time);
+
+            row.append(position, name, time);
+            body.appendChild(row);
+        });
+    }
+
+    menuScreen.classList.add("hidden");
+    finishScreen.classList.add("hidden");
+    leaderboardScreen.classList.remove("hidden");
+}
+
 // Update game
-function update(dt) {
+function update(dt, timestamp) {
+    if (gameState !== "playing") {
+        return;
+    }
+
+    elapsedTime = timestamp - startTime;
+
     // Horizontal movement
     let dx = 0;
 
@@ -183,13 +561,12 @@ function update(dt) {
     playerX += dx;
 
     // Jump
-    if (
-        (keys.has(" ") || keys.has("w") || keys.has("arrowup")) &&
-        onGround
-    ) {
+    if (jumpRequested && onGround) {
         velocityY = JUMP_FORCE;
         onGround = false;
     }
+
+    jumpRequested = false;
 
     // Gravity
     const previousBottom = playerY + PLAYER_H;
@@ -202,6 +579,7 @@ function update(dt) {
     // Platform collision
     if (velocityY >= 0) {
         for (const platform of platforms) {
+
             const currentBottom = playerY + PLAYER_H;
 
             const crossedPlatform =
@@ -213,9 +591,17 @@ function update(dt) {
                 playerX < platform.x + platform.width;
 
             if (crossedPlatform && horizontalOverlap) {
+
                 playerY = platform.y - PLAYER_H;
                 velocityY = 0;
                 onGround = true;
+
+                // Reaching the final floor wins the game
+                if (platform.level === FLOOR_COUNT - 1) {
+                    finishGame();
+                    return;
+                }
+
                 break;
             }
         }
@@ -243,7 +629,7 @@ function update(dt) {
         cameraY = targetCamera;
     }
 
-    // Reset if player falls below the screen
+    // Reset if player falls
     if (playerY > cameraY + HEIGHT + 100) {
         resetPlayer();
     }
@@ -251,6 +637,7 @@ function update(dt) {
 
 // Draw game
 function draw() {
+
     const climbedFloors = Math.max(
         0,
         (540 - (playerY + PLAYER_H)) / FLOOR_GAP
@@ -267,6 +654,7 @@ function draw() {
 
     // Platforms
     for (const platform of platforms) {
+
         const screenY = platform.y - cameraY;
 
         if (screenY < -20 || screenY > HEIGHT + 20) {
@@ -285,6 +673,7 @@ function draw() {
 
     // Red hazards
     for (const hazard of hazards) {
+
         const screenY = hazard.y - cameraY;
 
         if (screenY < -30 || screenY > HEIGHT + 30) {
@@ -311,26 +700,77 @@ function draw() {
         PLAYER_H
     );
 
-    // Floor counter
-    const currentFloor = Math.min(
-        FLOOR_COUNT,
-        Math.max(1, Math.floor(climbedFloors) + 1)
-    );
+    // HUD
+    if (gameState === "playing" || gameState === "finished") {
 
-    ctx.fillStyle = progress > 0.55 ? "#26345c" : "#ffffff";
-    ctx.font = "20px Arial";
+        const currentFloor = Math.min(
+            FLOOR_COUNT,
+            Math.max(1, Math.floor(climbedFloors) + 1)
+        );
 
-    ctx.fillText(
-        `Floor ${currentFloor} / ${FLOOR_COUNT}`,
-        20,
-        35
-    );
+        ctx.fillStyle = progress > 0.55 ? "#26345c" : "#ffffff";
+        ctx.font = "bold 20px Arial";
+
+        ctx.fillText(
+            `Floor ${currentFloor} / ${FLOOR_COUNT}`,
+            20,
+            35
+        );
+
+        ctx.textAlign = "right";
+
+        ctx.fillText(
+            formatTime(elapsedTime),
+            WIDTH - 20,
+            35
+        );
+
+        ctx.textAlign = "left";
+    }
 }
+
+// Buttons
+document.getElementById("startButton").addEventListener("click", () => {
+    startGame();
+});
+
+document.getElementById("leaderboardButton").addEventListener("click", () => {
+    showLeaderboard();
+});
+
+document.getElementById("leaderboardBack").addEventListener("click", () => {
+    leaderboardScreen.classList.add("hidden");
+
+    if (gameState === "finished") {
+        finishScreen.classList.remove("hidden");
+    } else {
+        menuScreen.classList.remove("hidden");
+    }
+});
+
+document.getElementById("saveScoreButton").addEventListener("click", () => {
+    saveScore();
+});
+
+document.getElementById("finishLeaderboardButton").addEventListener("click", () => {
+    showLeaderboard();
+});
+
+document.getElementById("menuButton").addEventListener("click", () => {
+    gameState = "menu";
+
+    finishScreen.classList.add("hidden");
+    menuScreen.classList.remove("hidden");
+
+    document.getElementById("saveScoreButton").textContent = "SAVE SCORE";
+    document.getElementById("saveScoreButton").disabled = false;
+});
 
 // Main game loop
 let lastTime = 0;
 
 function gameLoop(timestamp) {
+
     if (lastTime === 0) {
         lastTime = timestamp;
     }
@@ -340,13 +780,14 @@ function gameLoop(timestamp) {
 
     dt = Math.min(dt, 0.033);
 
-    update(dt);
+    update(dt, timestamp);
     draw();
 
     requestAnimationFrame(gameLoop);
 }
 
 requestAnimationFrame(gameLoop);
+
 </script>
 
 </body>
