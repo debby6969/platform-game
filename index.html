@@ -9,7 +9,7 @@
     <style>
         body {
             margin: 0;
-            background: #181825;
+            background: #151F4D;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -21,13 +21,14 @@
             height: auto;
             aspect-ratio: 5 / 3;
             display: block;
+            outline: none;
         }
     </style>
 </head>
 
 <body>
 
-<canvas id="game" width="1000" height="600"></canvas>
+<canvas id="game" width="1000" height="600" tabindex="0"></canvas>
 
 <script>
     // Canvas setup
@@ -55,16 +56,21 @@
     // Keyboard input
     const keys = new Set();
 
-    window.addEventListener("keydown", (e) => {
-        if (["a", "d", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    canvas.addEventListener("keydown", (e) => {
+        const key = e.key.toLowerCase();
+
+        if (["a", "d", "arrowleft", "arrowright"].includes(key)) {
             e.preventDefault();
-            keys.add(e.key.toLowerCase());
+            keys.add(key);
         }
     });
 
-    window.addEventListener("keyup", (e) => {
+    canvas.addEventListener("keyup", (e) => {
         keys.delete(e.key.toLowerCase());
     });
+
+    // Prevent stuck keys when browser loses focus
+    window.addEventListener("blur", () => keys.clear());
 
     // Update game logic
     function update(dt) {
@@ -78,7 +84,7 @@
             dx += SPEED * dt;
         }
 
-        // Move player - no boundaries
+        // Move player without boundaries
         playerX += dx;
     }
 
@@ -114,14 +120,13 @@
         requestAnimationFrame(gameLoop);
     }
 
+    // Start game
     requestAnimationFrame(gameLoop);
+
+    // Give canvas keyboard focus
+    canvas.focus();
 
 </script>
 
 </body>
 </html>
-
-
-</body>
-</html>
-
