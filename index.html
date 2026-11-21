@@ -4,9 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My First Game</title>
+    <title>Platform Climber</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             background: #151F4D;
@@ -14,14 +18,14 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            font-family: Arial, sans-serif;
         }
 
         canvas {
-            width: min(100vw, 1000px);
-            height: auto;
-            aspect-ratio: 5 / 3;
-            display: block;
-            outline: none;
+            background: #151F4D;
+            border: 2px solid #a6adc8;
+            max-width: 95vw;
+            max-height: 90vh;
         }
     </style>
 </head>
@@ -31,192 +35,238 @@
 <canvas id="game" width="1000" height="600" tabindex="0"></canvas>
 
 <script>
-    // Canvas setup
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-    // Window dimensions
-    const WIDTH = 1000;
-    const HEIGHT = 600;
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
 
-    // Platforms
-    const platforms = [
-        {
-            x: 250,
-            y: 300,
-            width: 500,
-            height: 10
-        },
-        {
-            x: 400,
-            y: 190,
-            width: 200,
-            height: 10
-        }
+// Player
+const PLAYER_W = 20;
+const PLAYER_H = 40;
+const SPEED = 250;
+
+const GRAVITY = 1300;
+const JUMP_FORCE = -560;
+
+let playerX;
+let playerY;
+let velocityY = 0;
+let onGround = false;
+
+const keys = new Set();
+
+// Platforms
+const platforms = [];
+
+// Generate floors
+function createPlatforms() {
+    platforms.length = 0;
+
+    const floorCount = 12;
+    const baseY = 540;
+
+    const positions = [
+        250, 550, 350, 120,
+        470, 700, 300, 80,
+        580, 350, 130, 650
     ];
 
-    // Player
-    const PLAYER_W = 20;
-    const PLAYER_H = 40;
-    const SPEED = 250;
+    for (let i = 0; i < floorCount; i++) {
+        const width = Math.max(170, 320 - i * 12);
+        const height = 10;
+        const y = baseY - i * 100 - Math.floor(i / 4) * 10;
 
-    let playerX = WIDTH / 2 - PLAYER_W / 2;
-    let playerY = platforms[0].y - PLAYER_H;
+        platforms.push({
+            x: positions[i],
+            y: y,
+            width: width,
+            height: height,
+            level: i
+        });
+    }
+}
 
-    // Physics
-    const GRAVITY = 1200;
-    const JUMP_FORCE = -550;
+createPlatforms();
 
-    let velocityY = 0;
-    let onGround = true;
+// Player starting position
+function resetPlayer() {
+    const start = platforms[0];
 
-    // Keyboard input
-    const keys = new Set();
+    playerX = start.x + (start.width - PLAYER_W) / 2;
+    playerY = start.y - PLAYER_H;
 
-    window.addEventListener("keydown", (e) => {
-        const key = e.key.toLowerCase();
+    velocityY = 0;
+    onGround = true;
+}
 
-        if (["a", "d", "arrowleft", "arrowright", " "].includes(key)) {
-            e.preventDefault();
-        }
+resetPlayer();
 
-        keys.add(key);
-    });
+// Camera
+let cameraY = 0;
 
-    window.addEventListener("keyup", (e) => {
-        keys.delete(e.key.toLowerCase());
-    });
+// Keyboard input
+window.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
 
-    window.addEventListener("blur", () => {
-        keys.clear();
-    });
-
-    // Jump function
-    function jump() {
-        if (onGround) {
-            velocityY = JUMP_FORCE;
-            onGround = false;
-        }
+    if ([" ", "arrowleft", "arrowright", "arrowup"].includes(key)) {
+        e.preventDefault();
     }
 
-    // Update game logic
-    function update(dt) {
+    keys.add(key);
+});
 
-        // Horizontal movement
-        let dx = 0;
+window.addEventListener("keyup", (e) => {
+    keys.delete(e.key.toLowerCase());
+});
 
-        if (keys.has("a") || keys.has("arrowleft")) {
-            dx -= SPEED * dt;
-        }
+// Colour interpolation
+function getFloorColour(level) {
+    const start = [166, 173, 200];
+    const end = [240, 245, 255];
 
-        if (keys.has("d") || keys.has("arrowright")) {
-            dx += SPEED * dt;
-        }
+    const t = Math.min(level / 11, 1);
 
-        playerX += dx;
+    const r = Math.round(start[0] + (end[0] - start[0]) * t);
+    const g = Math.round(start[1] + (end[1] - start[1]) * t);
+    const b = Math.round(start[2] + (end[2] - start[2]) * t);
 
-        // Reset player if completely off screen
-        if (playerX + PLAYER_W < 0 || playerX > WIDTH) {
-            playerX = WIDTH / 2 - PLAYER_W / 2;
-            playerY = platforms[0].y - PLAYER_H;
-            velocityY = 0;
-            onGround = true;
-        }
+    return `rgb(${r}, ${g}, ${b})`;
+}
 
-        // Jump
-        if (keys.has(" ")) {
-            jump();
-        }
+// Update game
+function update(dt) {
+    // Horizontal movement
+    let dx = 0;
 
-        // Store previous vertical position
-        const previousY = playerY;
+    if (keys.has("a") || keys.has("arrowleft")) {
+        dx -= SPEED * dt;
+    }
 
-        // Apply gravity
-        velocityY += GRAVITY * dt;
-        playerY += velocityY * dt;
+    if (keys.has("d") || keys.has("arrowright")) {
+        dx += SPEED * dt;
+    }
 
-        // Platform collision detection
+    playerX += dx;
+
+    // Jump
+    if ((keys.has(" ") || keys.has("w") || keys.has("arrowup")) && onGround) {
+        velocityY = JUMP_FORCE;
         onGround = false;
+    }
 
-        if (velocityY >= 0) {
-            for (const platform of platforms) {
+    // Gravity
+    const previousBottom = playerY + PLAYER_H;
 
-                const previousBottom = previousY + PLAYER_H;
-                const currentBottom = playerY + PLAYER_H;
+    velocityY += GRAVITY * dt;
+    playerY += velocityY * dt;
 
-                const overlapsPlatform =
-                    playerX + PLAYER_W > platform.x &&
-                    playerX < platform.x + platform.width;
+    onGround = false;
 
-                const crossedPlatform =
-                    previousBottom <= platform.y &&
-                    currentBottom >= platform.y;
+    // Platform collision
+    if (velocityY >= 0) {
+        for (const platform of platforms) {
+            const currentBottom = playerY + PLAYER_H;
 
-                if (overlapsPlatform && crossedPlatform) {
-                    playerY = platform.y - PLAYER_H;
-                    velocityY = 0;
-                    onGround = true;
-                    break;
-                }
+            const crossedPlatform =
+                previousBottom <= platform.y &&
+                currentBottom >= platform.y;
+
+            const horizontalOverlap =
+                playerX + PLAYER_W > platform.x &&
+                playerX < platform.x + platform.width;
+
+            if (crossedPlatform && horizontalOverlap) {
+                playerY = platform.y - PLAYER_H;
+                velocityY = 0;
+                onGround = true;
+                break;
             }
         }
-
-        // Fall below screen: reset player
-        if (playerY > HEIGHT) {
-            playerX = WIDTH / 2 - PLAYER_W / 2;
-            playerY = platforms[0].y - PLAYER_H;
-            velocityY = 0;
-            onGround = true;
-        }
     }
 
-    // Draw everything
-    function draw() {
+    // Camera follows player upwards
+    const targetCamera = playerY - 300;
 
-        // Background
-        ctx.fillStyle = "#151F4D";
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-        // Draw platforms
-        ctx.fillStyle = "#a6adc8";
-
-        for (const platform of platforms) {
-            ctx.fillRect(
-                platform.x,
-                platform.y,
-                platform.width,
-                platform.height
-            );
-        }
-
-        // Draw player
-        ctx.fillStyle = "#f38ba8";
-        ctx.fillRect(playerX, playerY, PLAYER_W, PLAYER_H);
+    if (targetCamera < cameraY) {
+        cameraY = targetCamera;
     }
 
-    // Game loop
-    let lastTime = 0;
+    // Reset if player falls off
+    if (playerY > cameraY + HEIGHT + 100) {
+        resetPlayer();
+        cameraY = 0;
+    }
+}
 
-    function gameLoop(timestamp) {
+// Draw game
+function draw() {
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-        if (lastTime === 0) {
-            lastTime = timestamp;
+    // Background
+    ctx.fillStyle = "#151F4D";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    // Platforms
+    for (const platform of platforms) {
+        const screenY = platform.y - cameraY;
+
+        if (screenY < -20 || screenY > HEIGHT + 20) {
+            continue;
         }
 
-        const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+        ctx.fillStyle = getFloorColour(platform.level);
+
+        ctx.fillRect(
+            platform.x,
+            screenY,
+            platform.width,
+            platform.height
+        );
+    }
+
+    // Player
+    ctx.fillStyle = "#f38ba8";
+
+    ctx.fillRect(
+        playerX,
+        playerY - cameraY,
+        PLAYER_W,
+        PLAYER_H
+    );
+
+    // Level indicator
+    const level = Math.max(
+        0,
+        platforms.filter(p => playerY + PLAYER_H <= p.y).length
+    );
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "18px Arial";
+    ctx.fillText("Climb higher!", 20, 35);
+}
+
+// Main game loop
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+    if (lastTime === 0) {
         lastTime = timestamp;
-
-        update(dt);
-        draw();
-
-        requestAnimationFrame(gameLoop);
     }
 
-    // Start game
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    // Prevent large jumps if the tab freezes
+    dt = Math.min(dt, 0.033);
+
+    update(dt);
+    draw();
+
     requestAnimationFrame(gameLoop);
+}
 
-    canvas.focus();
-
+requestAnimationFrame(gameLoop);
 </script>
 
 </body>
