@@ -1,1 +1,128 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My First Game</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #181825;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        canvas {
+            width: min(100vw, 1000px);
+            height: auto;
+            aspect-ratio: 5 / 3;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+<canvas id="game" width="1000" height="600"></canvas>
+
+<script>
+    // Canvas setup
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    // Window dimensions
+    const WIDTH = 1000;
+    const HEIGHT = 600;
+
+    // Platform
+    const PLATFORM_W = 500;
+    const PLATFORM_H = 10;
+    const PLATFORM_X = (WIDTH - PLATFORM_W) / 2;
+    const PLATFORM_Y = 300;
+
+    // Player
+    const PLAYER_W = 20;
+    const PLAYER_H = 40;
+    const SPEED = 250;
+
+    let playerX = PLATFORM_X + (PLATFORM_W - PLAYER_W) / 2;
+    const playerY = PLATFORM_Y - PLAYER_H;
+
+    // Keyboard input
+    const keys = new Set();
+
+    window.addEventListener("keydown", (e) => {
+        if (["a", "d", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+            e.preventDefault();
+            keys.add(e.key.toLowerCase());
+        }
+    });
+
+    window.addEventListener("keyup", (e) => {
+        keys.delete(e.key.toLowerCase());
+    });
+
+    // Update game logic
+    function update(dt) {
+        let dx = 0;
+
+        if (keys.has("a") || keys.has("arrowleft")) {
+            dx -= SPEED * dt;
+        }
+
+        if (keys.has("d") || keys.has("arrowright")) {
+            dx += SPEED * dt;
+        }
+
+        playerX += dx;
+
+        // Collision boundaries
+        const minX = Math.max(0, PLATFORM_X);
+        const maxX = Math.min(WIDTH, PLATFORM_X + PLATFORM_W) - PLAYER_W;
+
+        playerX = Math.max(minX, Math.min(playerX, maxX));
+    }
+
+    // Draw everything
+    function draw() {
+        // Background
+        ctx.fillStyle = "#01F6A8";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // Platform
+        ctx.fillStyle = "#a6adc8";
+        ctx.fillRect(PLATFORM_X, PLATFORM_Y, PLATFORM_W, PLATFORM_H);
+
+        // Player
+        ctx.fillStyle = "#f38ba8";
+        ctx.fillRect(playerX, playerY, PLAYER_W, PLAYER_H);
+    }
+
+    // Game loop
+    let lastTime = 0;
+
+    function gameLoop(timestamp) {
+        if (lastTime === 0) {
+            lastTime = timestamp;
+        }
+
+        const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+        lastTime = timestamp;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+
+</script>
+
+</body>
+</html>
+
