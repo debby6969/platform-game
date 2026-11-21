@@ -54,38 +54,50 @@ let playerX;
 let playerY;
 let velocityY = 0;
 let onGround = false;
-
 let cameraY = 0;
 
 const keys = new Set();
 const platforms = [];
+const hazards = [];
 
 // Platform layout
 function createPlatforms() {
     platforms.length = 0;
+    hazards.length = 0;
 
     const baseY = 540;
 
-    // Platforms alternate between nearby positions
     const centres = [
         500, 590, 490, 400,
         510, 600, 500, 400
     ];
 
     for (let i = 0; i < FLOOR_COUNT; i++) {
-
-        // Platforms gradually become narrower
         const width = Math.max(130, 260 - i * 4.5);
-
         const centre = centres[i % centres.length];
 
-        platforms.push({
+        const platform = {
             x: centre - width / 2,
             y: baseY - i * FLOOR_GAP,
             width: width,
             height: 10,
             level: i
-        });
+        };
+
+        platforms.push(platform);
+
+        // Add hazards from floor 11 onwards
+        if (i >= 10) {
+            const hazardWidth = 35;
+            const hazardHeight = 22;
+
+            hazards.push({
+                x: centre - hazardWidth / 2,
+                y: platform.y - hazardHeight,
+                width: hazardWidth,
+                height: hazardHeight
+            });
+        }
     }
 }
 
@@ -103,8 +115,6 @@ function resetPlayer() {
     cameraY = 0;
 }
 
-resetPlayer();
-
 // Keyboard controls
 window.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
@@ -120,7 +130,9 @@ window.addEventListener("keyup", (e) => {
     keys.delete(e.key.toLowerCase());
 });
 
-// Smooth colour interpolation
+resetPlayer();
+
+// Colour interpolation
 function interpolateColour(start, end, amount) {
     const r = Math.round(start[0] + (end[0] - start[0]) * amount);
     const g = Math.round(start[1] + (end[1] - start[1]) * amount);
@@ -129,27 +141,34 @@ function interpolateColour(start, end, amount) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Background becomes lighter as player climbs
 function getBackgroundColour(progress) {
-    const darkBlue = [21, 31, 77];
-    const lightBlue = [175, 205, 235];
-
-    return interpolateColour(darkBlue, lightBlue, progress);
+    return interpolateColour(
+        [21, 31, 77],
+        [175, 205, 235],
+        progress
+    );
 }
 
-// Platforms also become lighter
 function getFloorColour(level) {
-    const darkFloor = [166, 173, 200];
-    const lightFloor = [245, 248, 255];
+    return interpolateColour(
+        [166, 173, 200],
+        [245, 248, 255],
+        level / (FLOOR_COUNT - 1)
+    );
+}
 
-    const progress = level / (FLOOR_COUNT - 1);
-
-    return interpolateColour(darkFloor, lightFloor, progress);
+// Collision detection between rectangles
+function rectanglesOverlap(a, b) {
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
 }
 
 // Update game
 function update(dt) {
-
     // Horizontal movement
     let dx = 0;
 
@@ -183,7 +202,6 @@ function update(dt) {
     // Platform collision
     if (velocityY >= 0) {
         for (const platform of platforms) {
-
             const currentBottom = playerY + PLAYER_H;
 
             const crossedPlatform =
@@ -203,6 +221,21 @@ function update(dt) {
         }
     }
 
+    // Hazard collision
+    const player = {
+        x: playerX,
+        y: playerY,
+        width: PLAYER_W,
+        height: PLAYER_H
+    };
+
+    for (const hazard of hazards) {
+        if (rectanglesOverlap(player, hazard)) {
+            resetPlayer();
+            return;
+        }
+    }
+
     // Camera follows player upwards
     const targetCamera = playerY - 300;
 
@@ -210,7 +243,7 @@ function update(dt) {
         cameraY = targetCamera;
     }
 
-    // Reset if player falls below the visible area
+    // Reset if player falls below the screen
     if (playerY > cameraY + HEIGHT + 100) {
         resetPlayer();
     }
@@ -218,8 +251,6 @@ function update(dt) {
 
 // Draw game
 function draw() {
-
-    // Calculate climbing progress
     const climbedFloors = Math.max(
         0,
         (540 - (playerY + PLAYER_H)) / FLOOR_GAP
@@ -230,13 +261,12 @@ function draw() {
         1
     );
 
-    // Changing background
+    // Background
     ctx.fillStyle = getBackgroundColour(progress);
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // Draw platforms
+    // Platforms
     for (const platform of platforms) {
-
         const screenY = platform.y - cameraY;
 
         if (screenY < -20 || screenY > HEIGHT + 20) {
@@ -253,7 +283,25 @@ function draw() {
         );
     }
 
-    // Draw player
+    // Red hazards
+    for (const hazard of hazards) {
+        const screenY = hazard.y - cameraY;
+
+        if (screenY < -30 || screenY > HEIGHT + 30) {
+            continue;
+        }
+
+        ctx.fillStyle = "#ff3030";
+
+        ctx.fillRect(
+            hazard.x,
+            screenY,
+            hazard.width,
+            hazard.height
+        );
+    }
+
+    // Player
     ctx.fillStyle = "#f38ba8";
 
     ctx.fillRect(
@@ -279,11 +327,10 @@ function draw() {
     );
 }
 
-// Game loop
+// Main game loop
 let lastTime = 0;
 
 function gameLoop(timestamp) {
-
     if (lastTime === 0) {
         lastTime = timestamp;
     }
