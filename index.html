@@ -32,7 +32,7 @@
 
 <body>
 
-<canvas id="game" width="1000" height="600" tabindex="0"></canvas>
+<canvas id="game" width="1000" height="600"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
@@ -41,7 +41,6 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
-// Player
 const PLAYER_W = 20;
 const PLAYER_H = 40;
 const SPEED = 250;
@@ -55,33 +54,30 @@ let velocityY = 0;
 let onGround = false;
 
 const keys = new Set();
-
-// Platforms
 const platforms = [];
 
-// Generate floors
+// Platform layout
 function createPlatforms() {
     platforms.length = 0;
 
     const floorCount = 12;
     const baseY = 540;
 
-    const positions = [
-        250, 550, 350, 120,
-        470, 700, 300, 80,
-        580, 350, 130, 650
+    // Centre positions are deliberately controlled
+    const centres = [
+        500, 610, 490, 370,
+        500, 630, 510, 390,
+        520, 630, 500, 370
     ];
 
     for (let i = 0; i < floorCount; i++) {
-        const width = Math.max(170, 320 - i * 12);
-        const height = 10;
-        const y = baseY - i * 100 - Math.floor(i / 4) * 10;
+        const width = Math.max(210, 280 - i * 6);
 
         platforms.push({
-            x: positions[i],
-            y: y,
+            x: centres[i] - width / 2,
+            y: baseY - i * 85,
             width: width,
-            height: height,
+            height: 10,
             level: i
         });
     }
@@ -89,7 +85,7 @@ function createPlatforms() {
 
 createPlatforms();
 
-// Player starting position
+// Reset player
 function resetPlayer() {
     const start = platforms[0];
 
@@ -102,10 +98,9 @@ function resetPlayer() {
 
 resetPlayer();
 
-// Camera
 let cameraY = 0;
 
-// Keyboard input
+// Keyboard
 window.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
 
@@ -120,12 +115,12 @@ window.addEventListener("keyup", (e) => {
     keys.delete(e.key.toLowerCase());
 });
 
-// Colour interpolation
+// Floor colours
 function getFloorColour(level) {
     const start = [166, 173, 200];
     const end = [240, 245, 255];
 
-    const t = Math.min(level / 11, 1);
+    const t = level / 11;
 
     const r = Math.round(start[0] + (end[0] - start[0]) * t);
     const g = Math.round(start[1] + (end[1] - start[1]) * t);
@@ -134,7 +129,7 @@ function getFloorColour(level) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Update game
+// Update
 function update(dt) {
     // Horizontal movement
     let dx = 0;
@@ -150,12 +145,15 @@ function update(dt) {
     playerX += dx;
 
     // Jump
-    if ((keys.has(" ") || keys.has("w") || keys.has("arrowup")) && onGround) {
+    if (
+        (keys.has(" ") || keys.has("w") || keys.has("arrowup")) &&
+        onGround
+    ) {
         velocityY = JUMP_FORCE;
         onGround = false;
     }
 
-    // Gravity
+    // Gravity and vertical movement
     const previousBottom = playerY + PLAYER_H;
 
     velocityY += GRAVITY * dt;
@@ -192,18 +190,17 @@ function update(dt) {
         cameraY = targetCamera;
     }
 
-    // Reset if player falls off
+    // Reset if player falls below the screen
     if (playerY > cameraY + HEIGHT + 100) {
         resetPlayer();
         cameraY = 0;
     }
 }
 
-// Draw game
+// Draw
 function draw() {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    // Background
     ctx.fillStyle = "#151F4D";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -235,18 +232,13 @@ function draw() {
         PLAYER_H
     );
 
-    // Level indicator
-    const level = Math.max(
-        0,
-        platforms.filter(p => playerY + PLAYER_H <= p.y).length
-    );
-
+    // Instructions
     ctx.fillStyle = "#ffffff";
     ctx.font = "18px Arial";
     ctx.fillText("Climb higher!", 20, 35);
 }
 
-// Main game loop
+// Game loop
 let lastTime = 0;
 
 function gameLoop(timestamp) {
@@ -257,7 +249,6 @@ function gameLoop(timestamp) {
     let dt = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
-    // Prevent large jumps if the tab freezes
     dt = Math.min(dt, 0.033);
 
     update(dt);
