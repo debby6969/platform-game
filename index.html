@@ -22,7 +22,6 @@
         }
 
         canvas {
-            background: #151F4D;
             border: 2px solid #a6adc8;
             max-width: 95vw;
             max-height: 90vh;
@@ -48,10 +47,15 @@ const SPEED = 250;
 const GRAVITY = 1300;
 const JUMP_FORCE = -560;
 
+const FLOOR_COUNT = 30;
+const FLOOR_GAP = 85;
+
 let playerX;
 let playerY;
 let velocityY = 0;
 let onGround = false;
+
+let cameraY = 0;
 
 const keys = new Set();
 const platforms = [];
@@ -60,22 +64,24 @@ const platforms = [];
 function createPlatforms() {
     platforms.length = 0;
 
-    const floorCount = 12;
     const baseY = 540;
 
-    // Centre positions are deliberately controlled
+    // Platforms alternate between nearby positions
     const centres = [
-        500, 610, 490, 370,
-        500, 630, 510, 390,
-        520, 630, 500, 370
+        500, 590, 490, 400,
+        510, 600, 500, 400
     ];
 
-    for (let i = 0; i < floorCount; i++) {
-        const width = Math.max(210, 280 - i * 6);
+    for (let i = 0; i < FLOOR_COUNT; i++) {
+
+        // Platforms gradually become narrower
+        const width = Math.max(130, 260 - i * 4.5);
+
+        const centre = centres[i % centres.length];
 
         platforms.push({
-            x: centres[i] - width / 2,
-            y: baseY - i * 85,
+            x: centre - width / 2,
+            y: baseY - i * FLOOR_GAP,
             width: width,
             height: 10,
             level: i
@@ -94,13 +100,12 @@ function resetPlayer() {
 
     velocityY = 0;
     onGround = true;
+    cameraY = 0;
 }
 
 resetPlayer();
 
-let cameraY = 0;
-
-// Keyboard
+// Keyboard controls
 window.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
 
@@ -115,22 +120,36 @@ window.addEventListener("keyup", (e) => {
     keys.delete(e.key.toLowerCase());
 });
 
-// Floor colours
-function getFloorColour(level) {
-    const start = [166, 173, 200];
-    const end = [240, 245, 255];
-
-    const t = level / 11;
-
-    const r = Math.round(start[0] + (end[0] - start[0]) * t);
-    const g = Math.round(start[1] + (end[1] - start[1]) * t);
-    const b = Math.round(start[2] + (end[2] - start[2]) * t);
+// Smooth colour interpolation
+function interpolateColour(start, end, amount) {
+    const r = Math.round(start[0] + (end[0] - start[0]) * amount);
+    const g = Math.round(start[1] + (end[1] - start[1]) * amount);
+    const b = Math.round(start[2] + (end[2] - start[2]) * amount);
 
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Update
+// Background becomes lighter as player climbs
+function getBackgroundColour(progress) {
+    const darkBlue = [21, 31, 77];
+    const lightBlue = [175, 205, 235];
+
+    return interpolateColour(darkBlue, lightBlue, progress);
+}
+
+// Platforms also become lighter
+function getFloorColour(level) {
+    const darkFloor = [166, 173, 200];
+    const lightFloor = [245, 248, 255];
+
+    const progress = level / (FLOOR_COUNT - 1);
+
+    return interpolateColour(darkFloor, lightFloor, progress);
+}
+
+// Update game
 function update(dt) {
+
     // Horizontal movement
     let dx = 0;
 
@@ -153,7 +172,7 @@ function update(dt) {
         onGround = false;
     }
 
-    // Gravity and vertical movement
+    // Gravity
     const previousBottom = playerY + PLAYER_H;
 
     velocityY += GRAVITY * dt;
@@ -164,6 +183,7 @@ function update(dt) {
     // Platform collision
     if (velocityY >= 0) {
         for (const platform of platforms) {
+
             const currentBottom = playerY + PLAYER_H;
 
             const crossedPlatform =
@@ -190,22 +210,33 @@ function update(dt) {
         cameraY = targetCamera;
     }
 
-    // Reset if player falls below the screen
+    // Reset if player falls below the visible area
     if (playerY > cameraY + HEIGHT + 100) {
         resetPlayer();
-        cameraY = 0;
     }
 }
 
-// Draw
+// Draw game
 function draw() {
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    ctx.fillStyle = "#151F4D";
+    // Calculate climbing progress
+    const climbedFloors = Math.max(
+        0,
+        (540 - (playerY + PLAYER_H)) / FLOOR_GAP
+    );
+
+    const progress = Math.min(
+        climbedFloors / (FLOOR_COUNT - 1),
+        1
+    );
+
+    // Changing background
+    ctx.fillStyle = getBackgroundColour(progress);
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // Platforms
+    // Draw platforms
     for (const platform of platforms) {
+
         const screenY = platform.y - cameraY;
 
         if (screenY < -20 || screenY > HEIGHT + 20) {
@@ -222,7 +253,7 @@ function draw() {
         );
     }
 
-    // Player
+    // Draw player
     ctx.fillStyle = "#f38ba8";
 
     ctx.fillRect(
@@ -232,16 +263,27 @@ function draw() {
         PLAYER_H
     );
 
-    // Instructions
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "18px Arial";
-    ctx.fillText("Climb higher!", 20, 35);
+    // Floor counter
+    const currentFloor = Math.min(
+        FLOOR_COUNT,
+        Math.max(1, Math.floor(climbedFloors) + 1)
+    );
+
+    ctx.fillStyle = progress > 0.55 ? "#26345c" : "#ffffff";
+    ctx.font = "20px Arial";
+
+    ctx.fillText(
+        `Floor ${currentFloor} / ${FLOOR_COUNT}`,
+        20,
+        35
+    );
 }
 
 // Game loop
 let lastTime = 0;
 
 function gameLoop(timestamp) {
+
     if (lastTime === 0) {
         lastTime = timestamp;
     }
