@@ -78,13 +78,7 @@
             dx += SPEED * dt;
         }
 
-        playerX += dx;
-
-        // Collision boundaries
-        const minX = Math.max(0, PLATFORM_X);
-        const maxX = Math.min(WIDTH, PLATFORM_X + PLATFORM_W) - PLAYER_W;
-
-        playerX = Math.max(minX, Math.min(playerX, maxX));
+ 
     }
 
     // Draw everything
