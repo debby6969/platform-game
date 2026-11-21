@@ -78,7 +78,8 @@
             dx += SPEED * dt;
         }
 
- 
+        // Move player - no boundaries
+        playerX += dx;
     }
 
     // Draw everything
@@ -116,6 +117,10 @@
     requestAnimationFrame(gameLoop);
 
 </script>
+
+</body>
+</html>
+
 
 </body>
 </html>
